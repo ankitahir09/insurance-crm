@@ -1,6 +1,7 @@
 import dbConnect from "@/lib/db";
 import AuditLog from "@/models/AuditLog";
 import { IPolicy } from "@/models/Policy";
+import Admin from "@/models/Admin";
 import nodemailer from "nodemailer";
 
 
@@ -68,26 +69,30 @@ function getTemplate(daysLeft?: number): MessageTemplate {
   return TEMPLATES.generic;
 }
 
-// Gmail SMTP configuration
-function getTransporter() {
-  const emailUser = process.env.EMAIL_USER;
-  const emailAppPassword = process.env.EMAIL_APP_PASSWORD;
+// Gmail SMTP configuration (Dynamic)
+export async function getDynamicTransporter(userId: string) {
+  await dbConnect();
+  const admin = await Admin.findById(userId);
 
-  if (!emailUser || !emailAppPassword) {
+  if (!admin || !admin.agentEmailSettings?.isConfigured) {
     throw new Error(
-      "EMAIL_USER or EMAIL_APP_PASSWORD is not configured in the environment variables.",
+      "Agent SMTP credentials are not configured. Please update them in your Profile Settings.",
     );
   }
 
-  return nodemailer.createTransport({
+  const { smtpEmail, smtpAppPassword } = admin.agentEmailSettings;
+
+  const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 465,
     secure: true,
     auth: {
-      user: emailUser,
-      pass: emailAppPassword,
+      user: smtpEmail,
+      pass: smtpAppPassword,
     },
   });
+
+  return { transporter, emailUser: smtpEmail };
 }
 
 // Sends standard email alerts via nodemailer SMTP
@@ -116,8 +121,7 @@ Body:
 ${body}
 ----------------------------------------`);
 
-    const emailUser = process.env.EMAIL_USER;
-    const transporter = getTransporter();
+    const { transporter, emailUser } = await getDynamicTransporter(policy.userId.toString());
 
     const info = await transporter.sendMail({
       from: `"Agency Alerts" <${emailUser}>`,

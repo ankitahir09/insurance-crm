@@ -99,3 +99,41 @@ export async function changeAdminPasswordAction(data: {
 
   return { success: true };
 }
+
+// update agent email settings for dynamic SMTP
+export async function updateEmailSettingsAction(data: {
+  smtpEmail: string;
+  smtpAppPassword: string;
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user?.email) {
+    throw new Error('Authentication required for this operation');
+  }
+
+  await dbConnect();
+
+  const admin = await Admin.findOne({ email: session.user.email });
+  if (!admin) {
+    throw new Error('Logged-in administrator profile not found');
+  }
+
+  admin.agentEmailSettings = {
+    smtpEmail: data.smtpEmail.trim(),
+    smtpAppPassword: data.smtpAppPassword.trim(),
+    isConfigured: true,
+  };
+
+  await admin.save();
+
+  await AuditLog.create({
+    userId: session.user.id,
+    action: 'SYSTEM_INIT',
+    channel: 'System',
+    recipient: admin.email,
+    status: 'Success',
+    details: `Agent SMTP email settings updated securely by ${session.user.name || admin.email}.`,
+  });
+
+  revalidatePath('/profile');
+  return { success: true };
+}

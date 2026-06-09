@@ -29,7 +29,7 @@ export async function seedDatabaseAction() {
 
     // 2. Seed Mock Policies
     // Clear old policies to reset the environment
-    await Policy.deleteMany({});
+    await Policy.deleteMany({ userId: adminId });
     
     const today = new Date();
     today.setHours(0, 0, 0, 0);

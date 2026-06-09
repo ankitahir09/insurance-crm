@@ -25,6 +25,15 @@ export default async function ProfilePage() {
     name: admin.name,
     email: admin.email,
     mobile: admin.mobile,
+    agentEmailSettings: admin.agentEmailSettings ? {
+      smtpEmail: admin.agentEmailSettings.smtpEmail || '',
+      smtpAppPassword: admin.agentEmailSettings.smtpAppPassword || '',
+      isConfigured: admin.agentEmailSettings.isConfigured || false,
+    } : {
+      smtpEmail: '',
+      smtpAppPassword: '',
+      isConfigured: false,
+    }
   };
 
   return <ProfileForm admin={serializedAdmin} />;

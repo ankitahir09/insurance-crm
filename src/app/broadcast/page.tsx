@@ -19,7 +19,10 @@ export default async function BroadcastPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const activePolicies = await Policy.find({ expiryDate: { $gte: today } })
+  const activePolicies = await Policy.find({ 
+    userId: session.user.id,
+    expiryDate: { $gte: today } 
+  })
     .sort({ name: 1 })
     .lean();
 

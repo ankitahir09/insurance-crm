@@ -4,30 +4,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/db";
 import Policy from "@/models/Policy";
+import Admin from "@/models/Admin";
 import AuditLog from "@/models/AuditLog";
-import { replaceTokens } from "@/lib/services/communication";
-import nodemailer from "nodemailer";
-
-function getTransporter() {
-  const emailUser = process.env.EMAIL_USER;
-  const emailAppPassword = process.env.EMAIL_APP_PASSWORD;
-
-  if (!emailUser || !emailAppPassword) {
-    throw new Error(
-      "EMAIL_USER or EMAIL_APP_PASSWORD is not configured in the environment variables.",
-    );
-  }
-
-  return nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: {
-      user: emailUser,
-      pass: emailAppPassword,
-    },
-  });
-}
+import {
+  replaceTokens,
+  getDynamicTransporter,
+} from "@/lib/services/communication";
 
 // broadcast custom message to policies via email and/or whatsapp
 export async function sendBroadcastAction(data: {
@@ -56,6 +38,22 @@ export async function sendBroadcastAction(data: {
 
   await dbConnect();
 
+  if (data.channels.includes("Email")) {
+    const admin = await Admin.findById(session.user.id);
+    if (
+      !admin ||
+      !admin.agentEmailSettings?.isConfigured ||
+      !admin.agentEmailSettings?.smtpEmail
+    ) {
+      return {
+        success: false,
+        error: "SMTP_NOT_CONFIGURED",
+        message:
+          "Broadcast failed: Please set up your Gmail ID and 16-character App Password in your Profile Settings to enable messaging.",
+      };
+    }
+  }
+
   // scope query to current user
   const policies = await Policy.find({
     _id: { $in: data.policyIds },
@@ -81,8 +79,9 @@ To: ${policy.email}
 Content: ${formattedMessage}
 ----------------------------------------`);
 
-        const emailUser = process.env.EMAIL_USER;
-        const transporter = getTransporter();
+        const { transporter, emailUser } = await getDynamicTransporter(
+          session.user.id,
+        );
 
         const info = await transporter.sendMail({
           from: `"Agency Alerts" <${emailUser}>`,

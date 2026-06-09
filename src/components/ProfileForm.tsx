@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { User, Phone, Mail, Lock, ShieldCheck, CheckCircle2, Loader2 } from 'lucide-react';
-import { updateAdminProfileAction, changeAdminPasswordAction } from '@/app/actions/admin';
+import { updateAdminProfileAction, changeAdminPasswordAction, updateEmailSettingsAction } from '@/app/actions/admin';
 import { useRouter } from 'next/navigation';
 
 interface ProfileFormProps {
@@ -10,6 +10,11 @@ interface ProfileFormProps {
     name: string;
     email: string;
     mobile: string;
+    agentEmailSettings?: {
+      smtpEmail: string;
+      smtpAppPassword: string;
+      isConfigured: boolean;
+    };
   };
 }
 
@@ -26,6 +31,10 @@ export default function ProfileForm({ admin }: ProfileFormProps) {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
+  // Email settings form state
+  const [smtpEmail, setSmtpEmail] = useState(admin.agentEmailSettings?.smtpEmail || '');
+  const [smtpAppPassword, setSmtpAppPassword] = useState(admin.agentEmailSettings?.smtpAppPassword || '');
+
   // Indicators
   const [profilePending, setProfilePending] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState(false);
@@ -34,6 +43,10 @@ export default function ProfileForm({ admin }: ProfileFormProps) {
   const [passwordPending, setPasswordPending] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  const [emailSettingsPending, setEmailSettingsPending] = useState(false);
+  const [emailSettingsSuccess, setEmailSettingsSuccess] = useState(false);
+  const [emailSettingsError, setEmailSettingsError] = useState<string | null>(null);
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +99,26 @@ export default function ProfileForm({ admin }: ProfileFormProps) {
       setPasswordError(err.message || 'Failed to update password');
     } finally {
       setPasswordPending(false);
+    }
+  };
+
+  const handleEmailSettingsUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailSettingsPending(true);
+    setEmailSettingsSuccess(false);
+    setEmailSettingsError(null);
+
+    try {
+      const result = await updateEmailSettingsAction({ smtpEmail, smtpAppPassword });
+      if (result.success) {
+        setEmailSettingsSuccess(true);
+        router.refresh();
+        setTimeout(() => setEmailSettingsSuccess(false), 3000);
+      }
+    } catch (err: any) {
+      setEmailSettingsError(err.message || 'Failed to update email settings');
+    } finally {
+      setEmailSettingsPending(false);
     }
   };
 
@@ -291,6 +324,86 @@ export default function ProfileForm({ admin }: ProfileFormProps) {
           </div>
         </div>
 
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Email Settings Card */}
+        <div className="bg-white border border-neutral-200 p-6 shadow-sm flex flex-col justify-between">
+          <div className="space-y-6">
+            <div className="flex items-center space-x-2 border-b border-neutral-100 pb-3">
+              <Mail className="w-5 h-5 text-orange-655" />
+              <h3 className="font-mono text-sm font-black text-neutral-900 uppercase tracking-wider">
+                SMTP EMAIL SETTINGS
+              </h3>
+            </div>
+
+            {emailSettingsError && (
+              <div className="p-3 bg-red-50 border-l-2 border-red-500 font-mono text-xs text-red-800">
+                ERROR: {emailSettingsError}
+              </div>
+            )}
+
+            {emailSettingsSuccess && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 font-mono text-xs text-emerald-850 flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>SMTP SETTINGS SAVED SUCCESSFULLY</span>
+              </div>
+            )}
+
+            <form onSubmit={handleEmailSettingsUpdate} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono font-bold uppercase tracking-wider text-neutral-500 mb-2">
+                  SMTP EMAIL //
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 w-4 h-4 text-neutral-400" />
+                  <input
+                    type="email"
+                    value={smtpEmail}
+                    onChange={(e) => setSmtpEmail(e.target.value)}
+                    required
+                    placeholder="agent@gmail.com"
+                    className="w-full pl-9 pr-4 py-2.5 bg-neutral-50 border border-neutral-200 focus:outline-none focus:border-orange-500 text-sm font-mono rounded-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono font-bold uppercase tracking-wider text-neutral-500 mb-2">
+                  APP PASSWORD //
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 w-4 h-4 text-neutral-400" />
+                  <input
+                    type="password"
+                    value={smtpAppPassword}
+                    onChange={(e) => setSmtpAppPassword(e.target.value)}
+                    required
+                    placeholder="16-digit app password"
+                    className="w-full pl-9 pr-4 py-2.5 bg-neutral-50 border border-neutral-200 focus:outline-none focus:border-orange-500 text-sm font-mono rounded-none"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={emailSettingsPending}
+                  className="px-5 py-3 bg-neutral-900 hover:bg-orange-655 text-white font-mono font-bold uppercase tracking-wider text-xs flex items-center justify-center space-x-2 transition-colors disabled:opacity-50 rounded-none min-h-[44px] w-full"
+                >
+                  {emailSettingsPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
+                      <span>SAVING SETTINGS...</span>
+                    </>
+                  ) : (
+                    <span>SAVE SMTP SETTINGS</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
 
     </div>
